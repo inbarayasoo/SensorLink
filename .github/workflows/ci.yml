@@ -194,21 +194,35 @@ jobs:
             | xargs clang-tidy -p build/host --header-filter='(proto|server)/'
 
       # node/cmsis is vendored upstream code (see node/CMakeLists.txt),
-      # not ours to fix -- excluded so findings stay actionable.
+      # not ours to fix -- -i node/cmsis keeps cppcheck from starting a
+      # check there, and --suppress=*:node/cmsis/* additionally drops any
+      # finding cppcheck still reports inside it when it's pulled in via
+      # #include from a file that is being checked.
       #
       # -I . (not -I proto/-I server/-I node): every #include in this repo
       # is written relative to the repository root (see e.g.
       # server/CMakeLists.txt's target_include_directories), so that is the
       # one include root that actually resolves them.
       #
-      # missingInclude is suppressed outright: this job does not check out
-      # the FreeRTOS-Kernel submodule (kept fast on purpose, see the
-      # checkout step above), so node/'s FreeRTOS.h/task.h/... are never
-      # going to resolve here -- that is expected, not a finding to act on.
+      # missingInclude/missingIncludeSystem are suppressed outright: this
+      # job does not check out the FreeRTOS-Kernel submodule (kept fast on
+      # purpose, see the checkout step above), so node/'s FreeRTOS.h/
+      # task.h/... never resolve, and cppcheck does not ship libstdc++'s
+      # own headers either -- neither is a finding to act on.
+      #
+      # unusedFunction is suppressed because this invocation only sees
+      # proto/, server/, and node/ -- not client/ or tests/, which is where
+      # most of these public accessors are actually called from. Without a
+      # whole-program view, cppcheck flags essentially every public getter
+      # as dead code, which is noise, not a finding.
       - name: cppcheck (proto/, server/, node/)
         run: |
           cppcheck --enable=all --error-exitcode=1 --inline-suppr \
             --suppress=missingInclude \
+            --suppress=missingIncludeSystem \
+            --suppress=toomanyconfigs \
+            --suppress=unusedFunction \
+            --suppress='*:node/cmsis/*' \
             -I . -I node/cmsis \
             -i node/cmsis \
             proto server node

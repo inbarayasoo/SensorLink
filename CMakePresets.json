@@ -22,11 +22,23 @@
         "SENSORLINK_BUILD_TESTS": "ON",
         "SENSORLINK_COVERAGE": "ON"
       }
+    },
+    {
+      "name": "firmware",
+      "displayName": "Node firmware (arm-none-eabi, Cortex-M3)",
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/build/firmware",
+      "toolchainFile": "${sourceDir}/cmake/arm-none-eabi.cmake",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "MinSizeRel",
+        "SENSORLINK_BUILD_TESTS": "OFF"
+      }
     }
   ],
   "buildPresets": [
     { "name": "host", "configurePreset": "host" },
-    { "name": "coverage", "configurePreset": "coverage" }
+    { "name": "coverage", "configurePreset": "coverage" },
+    { "name": "firmware", "configurePreset": "firmware" }
   ],
   "testPresets": [
     {

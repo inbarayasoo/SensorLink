@@ -30,6 +30,40 @@ target_link_libraries(proto_tests PRIVATE
     sensorlink_warnings
     GTest::gtest_main)
 
+# --- server test executable -------------------------------------------------
+# Separate from proto_tests because it links the server library (epoll,
+# sockets) instead of the header-only proto library -- there is no reason to
+# pull sys/epoll.h into a binary that only exercises framing and CRC.
+add_executable(server_tests
+    event_loop_test.cpp
+    connection_test.cpp
+    device_session_test.cpp
+    ingest_test.cpp
+    subscriber_test.cpp
+    store_test.cpp)
+
+target_link_libraries(server_tests PRIVATE
+    server
+    sensorlink_warnings
+    GTest::gtest_main)
+
+# --- client test executable -------------------------------------------------
+# Separate from server_tests because it links client_line_protocol, not the
+# server library -- the two share nothing but GoogleTest.
+add_executable(client_tests
+    client_line_protocol_test.cpp)
+
+target_link_libraries(client_tests PRIVATE
+    client_line_protocol
+    sensorlink_warnings
+    GTest::gtest_main)
+
 # Register every TEST() with CTest so `ctest` runs them individually.
 include(GoogleTest)
 gtest_discover_tests(proto_tests)
+gtest_discover_tests(server_tests)
+gtest_discover_tests(client_tests)
+
+# tests/integration/ is not GoogleTest -- see run_integration_test.py, which
+# drives real server/client/QEMU subprocesses instead of running in-process.
+add_subdirectory(integration)

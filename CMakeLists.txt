@@ -3,7 +3,7 @@ cmake_minimum_required(VERSION 3.21)
 project(SensorLink
     VERSION 0.1.0
     DESCRIPTION "End-to-end telemetry system: shared protocol library, firmware node, epoll server"
-    LANGUAGES CXX)
+    LANGUAGES CXX C)  # C is needed for the vendored FreeRTOS-Kernel sources under node/
 
 # --- Global C++ settings -----------------------------------------------------
 set(CMAKE_CXX_STANDARD 17)
@@ -34,9 +34,24 @@ target_compile_options(sensorlink_warnings INTERFACE
     -Wsign-conversion)
 
 # --- Subdirectories --------------------------------------------------------
+# proto/ is header-only and compiles unchanged for both targets -- it is the
+# one piece of the repository both the firmware and the host build share, so
+# it is configured unconditionally, before the split below.
 add_subdirectory(proto)
 
-if(SENSORLINK_BUILD_TESTS)
-    enable_testing()
-    add_subdirectory(tests)
+# CMAKE_CROSSCOMPILING is set by CMake itself once the arm-none-eabi toolchain
+# file (cmake/arm-none-eabi.cmake) is in effect. The firmware and the host
+# build are two different targets built from two different invocations of
+# CMake (see the "host" and "firmware" presets) -- never both in one
+# configure, since GoogleTest and the epoll-based server code are not things
+# a bare-metal Cortex-M3 build can produce.
+if(CMAKE_CROSSCOMPILING)
+    add_subdirectory(node)
+else()
+    add_subdirectory(server)
+    add_subdirectory(client)
+    if(SENSORLINK_BUILD_TESTS)
+        enable_testing()
+        add_subdirectory(tests)
+    endif()
 endif()

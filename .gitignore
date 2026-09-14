@@ -1,0 +1,39 @@
+# Local-only planning notes (never commit)
+docs/PLAN.md
+
+# Build output
+build/
+build-*/
+cmake-build-*/
+out/
+
+# CMake
+CMakeCache.txt
+CMakeFiles/
+CMakeUserPresets.json
+_deps/
+
+# Compiled objects / firmware images
+*.o
+*.obj
+*.a
+*.elf
+*.bin
+*.hex
+*.map
+*.lst
+
+# Coverage
+*.gcda
+*.gcno
+*.gcov
+coverage/
+lcov.info
+
+# Editors / OS
+.vscode/
+.idea/
+*.swp
+*~
+.DS_Store
+Thumbs.db

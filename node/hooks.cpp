@@ -37,7 +37,7 @@ void vApplicationGetIdleTaskMemory(StaticTask_t** idle_task_tcb_buffer,
 // canary pattern. A cooling-unit node runs unattended for months; a
 // sensor_task whose stack was under-budgeted must stop loudly here, not
 // corrupt process_task's moving-average state next to it in RAM.
-void vApplicationStackOverflowHook(TaskHandle_t, char* task_name) {
+void vApplicationStackOverflowHook(TaskHandle_t, const char* task_name) {
     semihosting::write_line("STACK OVERFLOW in task: ");
     semihosting::write_line(task_name);
     for (;;) {

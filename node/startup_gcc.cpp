@@ -86,7 +86,7 @@ volatile uint32_t lr;
 volatile uint32_t pc;
 volatile uint32_t psr;
 
-static __attribute__((used)) void prvGetRegistersFromStack(uint32_t* fault_stack_address) {
+static __attribute__((used)) void prvGetRegistersFromStack(const uint32_t* fault_stack_address) {
     r0 = fault_stack_address[0];
     r1 = fault_stack_address[1];
     r2 = fault_stack_address[2];

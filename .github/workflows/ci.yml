@@ -63,6 +63,8 @@ jobs:
   firmware-build:
     name: Firmware build (ARM Cortex-M3)
     runs-on: ubuntu-latest
+    env:
+      ARM_TOOLCHAIN_VERSION: 13.2.rel1
     steps:
       # recursive: the FreeRTOS kernel is a git submodule (third_party/FreeRTOS-Kernel)
       # and the firmware will not configure without its sources present.
@@ -73,8 +75,21 @@ jobs:
       - name: Install dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y --no-install-recommends \
-            cmake ninja-build gcc-arm-none-eabi
+          sudo apt-get install -y --no-install-recommends cmake ninja-build
+
+      # Ubuntu's own gcc-arm-none-eabi apt package has a long-standing
+      # packaging bug: its C++ headers (cstdint, cstddef, ...) are missing
+      # from the search path, so any C++ translation unit fails to compile.
+      # Fetching the toolchain directly from ARM's own releases avoids that
+      # bug entirely and, pinned to 13.2.1, matches the version used for
+      # local development.
+      - name: Install ARM GNU Toolchain
+        run: |
+          curl -L -o arm-toolchain.tar.xz \
+            "https://developer.arm.com/-/media/Files/downloads/gnu/${ARM_TOOLCHAIN_VERSION}/binrel/arm-gnu-toolchain-${ARM_TOOLCHAIN_VERSION}-x86_64-arm-none-eabi.tar.xz"
+          mkdir -p "$HOME/arm-toolchain"
+          tar -xf arm-toolchain.tar.xz -C "$HOME/arm-toolchain" --strip-components=1
+          echo "$HOME/arm-toolchain/bin" >> "$GITHUB_PATH"
 
       - name: Configure
         run: cmake --preset firmware
@@ -94,6 +109,8 @@ jobs:
   integration:
     name: QEMU + server integration test
     runs-on: ubuntu-latest
+    env:
+      ARM_TOOLCHAIN_VERSION: 13.2.rel1
     # No point booting QEMU and waiting through the test's timing windows if
     # either half does not even build on its own.
     needs: [host-build-test, firmware-build]
@@ -106,7 +123,16 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends \
-            cmake ninja-build g++ gcc-arm-none-eabi qemu-system-arm
+            cmake ninja-build g++ qemu-system-arm
+
+      # Same bug, same fix as firmware-build -- see the comment there.
+      - name: Install ARM GNU Toolchain
+        run: |
+          curl -L -o arm-toolchain.tar.xz \
+            "https://developer.arm.com/-/media/Files/downloads/gnu/${ARM_TOOLCHAIN_VERSION}/binrel/arm-gnu-toolchain-${ARM_TOOLCHAIN_VERSION}-x86_64-arm-none-eabi.tar.xz"
+          mkdir -p "$HOME/arm-toolchain"
+          tar -xf arm-toolchain.tar.xz -C "$HOME/arm-toolchain" --strip-components=1
+          echo "$HOME/arm-toolchain/bin" >> "$GITHUB_PATH"
 
       - name: Build host (server, client, load generator)
         run: |

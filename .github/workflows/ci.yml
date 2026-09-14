@@ -215,6 +215,14 @@ jobs:
       # most of these public accessors are actually called from. Without a
       # whole-program view, cppcheck flags essentially every public getter
       # as dead code, which is noise, not a finding.
+      #
+      # cstyleCast is suppressed under node/ specifically: register-access
+      # macros in the vendored CMSIS headers (e.g. CMSDK_UART0, defined as
+      # a C-style cast in node/cmsis/CMSDK_CM3.h) expand at their call site,
+      # so cppcheck attributes the finding to whichever of our files uses
+      # the macro, not to the vendor header -i node/cmsis already excludes.
+      # proto/ and server/ keep the check -- a C-style cast there would be
+      # a real style issue.
       - name: cppcheck (proto/, server/, node/)
         run: |
           cppcheck --enable=all --error-exitcode=1 --inline-suppr \
@@ -222,6 +230,7 @@ jobs:
             --suppress=missingIncludeSystem \
             --suppress=toomanyconfigs \
             --suppress=unusedFunction \
+            --suppress='cstyleCast:node/*' \
             --suppress='*:node/cmsis/*' \
             -I . -I node/cmsis \
             -i node/cmsis \

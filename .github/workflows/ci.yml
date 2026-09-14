@@ -195,10 +195,20 @@ jobs:
 
       # node/cmsis is vendored upstream code (see node/CMakeLists.txt),
       # not ours to fix -- excluded so findings stay actionable.
+      #
+      # -I . (not -I proto/-I server/-I node): every #include in this repo
+      # is written relative to the repository root (see e.g.
+      # server/CMakeLists.txt's target_include_directories), so that is the
+      # one include root that actually resolves them.
+      #
+      # missingInclude is suppressed outright: this job does not check out
+      # the FreeRTOS-Kernel submodule (kept fast on purpose, see the
+      # checkout step above), so node/'s FreeRTOS.h/task.h/... are never
+      # going to resolve here -- that is expected, not a finding to act on.
       - name: cppcheck (proto/, server/, node/)
         run: |
           cppcheck --enable=all --error-exitcode=1 --inline-suppr \
-            --suppress=missingIncludeSystem \
-            -I proto -I server -I node \
+            --suppress=missingInclude \
+            -I . -I node/cmsis \
             -i node/cmsis \
             proto server node

@@ -54,23 +54,12 @@ int connect_to_server(const std::string& host, std::uint16_t port) {
     return fd;
 }
 
-// --- for you to complete -------------------------------------------------
-//
-// Sends one HELLO (any device_id works -- pick something distinct from the
-// real firmware's device_id of 1, e.g. 999, so the two are easy to tell
-// apart if you ever add logging; offered_rate_hz can be anything too, since
-// the server only caps what it *offers* in CONFIG -- it never polices how
-// fast a device actually sends SAMPLE frames afterwards).
-//
-// Then loops until `duration` has elapsed, and on every iteration: builds a
-// proto::SamplePayload for `metric_id`, encodes it with
-// proto::encode_frame, and writes the result to fd with ::send. No delay
-// between iterations -- send as fast as the loop runs. Bump timestamp_ms
-// and value_milli by some fixed step each time so frames are not
-// byte-for-byte identical (not required for this to work, just makes
-// captured traffic easier to read if you ever look at it).
-//
-// This is the exact same shape as node/tasks/telemetry_task.cpp's own
+// Sends one HELLO (device_id 999, distinct from the real firmware's device_id
+// of 1) and then blasts SAMPLE frames for `metric_id` until `duration`
+// elapses, bumping timestamp_ms and value_milli each iteration so frames are
+// not byte-for-byte identical. No delay between iterations -- send as fast
+// as the loop runs, since the point is to build backpressure fast (see the
+// file header above). Same shape as node/tasks/telemetry_task.cpp's own
 // SAMPLE encoding -- proto::SamplePayload, proto::encode_frame, write the
 // bytes out -- just a raw TCP socket standing in for the UART.
 void run_load(int fd, std::uint8_t metric_id, std::chrono::seconds duration) {

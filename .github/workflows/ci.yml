@@ -1,0 +1,178 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  host-build-test:
+    name: Host build + test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            cmake ninja-build g++ gcovr
+
+      # GoogleTest is fetched from GitHub at configure time (see
+      # tests/CMakeLists.txt) and pinned to a fixed tag, so the download is
+      # identical on every run until that tag changes -- a safe cache key.
+      - name: Cache GoogleTest checkout
+        uses: actions/cache@v4
+        with:
+          path: build/coverage/_deps
+          key: googletest-${{ runner.os }}-${{ hashFiles('tests/CMakeLists.txt') }}
+
+      # The "coverage" preset builds the same server/client/proto targets as
+      # "host", just instrumented with --coverage (see CMakeLists.txt), so
+      # one configure+build+test here covers both the build check and the
+      # coverage number -- no need to build twice.
+      - name: Configure
+        run: cmake --preset coverage
+
+      - name: Build
+        run: cmake --build --preset coverage
+
+      - name: Test
+        run: ctest --preset coverage
+
+      - name: Measure coverage
+        run: |
+          gcovr --root . --object-directory build/coverage \
+                --filter 'proto/' --filter 'server/' --filter 'client/' \
+                --print-summary | tee coverage-summary.txt
+          {
+            echo "### Coverage summary"
+            echo '```'
+            cat coverage-summary.txt
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  firmware-build:
+    name: Firmware build (ARM Cortex-M3)
+    runs-on: ubuntu-latest
+    steps:
+      # recursive: the FreeRTOS kernel is a git submodule (third_party/FreeRTOS-Kernel)
+      # and the firmware will not configure without its sources present.
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            cmake ninja-build gcc-arm-none-eabi
+
+      - name: Configure
+        run: cmake --preset firmware
+
+      - name: Build
+        run: cmake --build --preset firmware
+
+      - name: Report firmware size
+        run: |
+          {
+            echo "### Firmware size (arm-none-eabi-size)"
+            echo '```'
+            arm-none-eabi-size build/firmware/node/sensorlink-node.elf
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  integration:
+    name: QEMU + server integration test
+    runs-on: ubuntu-latest
+    # No point booting QEMU and waiting through the test's timing windows if
+    # either half does not even build on its own.
+    needs: [host-build-test, firmware-build]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            cmake ninja-build g++ gcc-arm-none-eabi qemu-system-arm
+
+      - name: Build host (server, client, load generator)
+        run: |
+          cmake --preset host
+          cmake --build --preset host
+
+      - name: Build firmware
+        run: |
+          cmake --preset firmware
+          cmake --build --preset firmware
+
+      - name: Run integration test
+        run: python3 tests/integration/run_integration_test.py
+
+      # run_integration_test.py writes each subprocess's log (server, qemu,
+      # load_generator) under a fresh tempfile.mkdtemp(prefix=...) directory
+      # and prints its path -- glob for it here rather than parsing that
+      # line out of the step's own stdout.
+      - name: Upload logs on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: integration-logs
+          path: /tmp/sensorlink-integration-*/
+
+  static-analysis:
+    name: Static analysis (clang-tidy + cppcheck)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            cmake ninja-build g++ clang-tidy cppcheck
+
+      # clang-tidy needs a compile_commands.json to know each file's include
+      # paths and flags. Configuring (not building) the host preset is
+      # enough to generate one for server/. node/ is left out of clang-tidy
+      # on purpose: it only compiles under the arm-none-eabi cross toolchain
+      # against vendored FreeRTOS/CMSIS headers, which a host
+      # compile_commands.json cannot describe. cppcheck below, which does
+      # not need a compile database, still covers it.
+      - name: Configure (for compile_commands.json)
+        run: cmake --preset host -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
+
+      # proto/ is a header-only INTERFACE library (see proto/CMakeLists.txt):
+      # it has no .cpp of its own, so it has no direct entry in
+      # compile_commands.json. server/*.cpp is what actually includes the
+      # proto/ headers (frame_parser.hpp, messages.hpp, ...), so running
+      # clang-tidy on those translation units, with --header-filter
+      # widened to include proto/, gets both directories analyzed through
+      # the real include graph instead of guessing flags for a header in
+      # isolation.
+      - name: clang-tidy (proto/, server/)
+        run: |
+          find server -name '*.cpp' \
+            | xargs clang-tidy -p build/host --header-filter='(proto|server)/'
+
+      # node/cmsis is vendored upstream code (see node/CMakeLists.txt),
+      # not ours to fix -- excluded so findings stay actionable.
+      - name: cppcheck (proto/, server/, node/)
+        run: |
+          cppcheck --enable=all --error-exitcode=1 --inline-suppr \
+            --suppress=missingIncludeSystem \
+            -I proto -I server -I node \
+            -i node/cmsis \
+            proto server node

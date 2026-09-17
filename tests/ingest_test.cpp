@@ -199,3 +199,50 @@ TEST_F(IngestTest, MalformedHelloPayloadSizeIsIgnored) {
 
     EXPECT_FALSE(ing.has_session());
 }
+
+TEST_F(IngestTest, SampleUpdatesTheSessionsLastUptimeMs) {
+    server::event_loop loop;
+    server::connection conn(loop, fds_[0]);
+    server::store data_store;
+    server::ingest ing(conn, /*session_id=*/1, data_store);
+
+    SendFromDevice(proto::MessageType::kHello,
+                    proto::HelloPayload{/*device_id=*/1, /*fw_version=*/1,
+                                         /*metric_count=*/1, /*offered_rate_hz=*/2});
+    ASSERT_TRUE(conn.try_read());
+    ing.on_readable();
+    ASSERT_TRUE(conn.try_write());
+    ReadOneFrameFromServer();  // drain the CONFIG reply
+
+    SendFromDevice(proto::MessageType::kSample,
+                    proto::SamplePayload{/*session_id=*/1, /*timestamp_ms=*/4242,
+                                          /*value_milli=*/1000, /*metric_id=*/0});
+    ASSERT_TRUE(conn.try_read());
+    ing.on_readable();
+
+    ASSERT_TRUE(ing.has_session());
+    EXPECT_EQ(ing.session()->last_uptime_ms(), 4242u);
+}
+
+TEST_F(IngestTest, HeartbeatUpdatesTheSessionsLastUptimeMs) {
+    server::event_loop loop;
+    server::connection conn(loop, fds_[0]);
+    server::store data_store;
+    server::ingest ing(conn, /*session_id=*/1, data_store);
+
+    SendFromDevice(proto::MessageType::kHello,
+                    proto::HelloPayload{/*device_id=*/1, /*fw_version=*/1,
+                                         /*metric_count=*/1, /*offered_rate_hz=*/2});
+    ASSERT_TRUE(conn.try_read());
+    ing.on_readable();
+    ASSERT_TRUE(conn.try_write());
+    ReadOneFrameFromServer();  // drain the CONFIG reply
+
+    SendFromDevice(proto::MessageType::kHeartbeat,
+                    proto::HeartbeatPayload{/*session_id=*/1, /*uptime_ms=*/9000});
+    ASSERT_TRUE(conn.try_read());
+    ing.on_readable();
+
+    ASSERT_TRUE(ing.has_session());
+    EXPECT_EQ(ing.session()->last_uptime_ms(), 9000u);
+}

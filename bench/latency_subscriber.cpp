@@ -3,8 +3,9 @@
 // metric, and for every update line that arrives, computes how long it took
 // to get from bench/load_generator.cpp's send() call to here.
 //
-// server/subscriber.cpp's publish() sends "<metric> <timestamp_ms>
-// <value_milli>\n" -- the same line format client/line_protocol.cpp parses.
+// server/subscriber.cpp's publish() sends "<metric> <session_id>
+// <timestamp_ms> <value_milli>\n" -- the same line format
+// client/line_protocol.cpp parses.
 // timestamp_ms here is the generator's own steady_clock reading at send
 // time (see bench/load_generator.cpp's comment on why that clock is safe to
 // compare across processes on the same host); subtracting it from this
@@ -89,10 +90,18 @@ void process_lines(std::vector<std::uint8_t>& buffer, const std::string& metric,
 
         const std::size_t first_space = line.find(' ');
         if (first_space != std::string::npos && line.substr(0, first_space) == metric) {
+            // Skip the session_id field (2nd) to reach timestamp_ms (3rd) --
+            // see the header comment on the current wire format.
             const std::size_t second_space = line.find(' ', first_space + 1);
-            const std::string ts_field = (second_space == std::string::npos)
-                ? line.substr(first_space + 1)
-                : line.substr(first_space + 1, second_space - first_space - 1);
+            const std::size_t third_space =
+                (second_space == std::string::npos) ? std::string::npos : line.find(' ', second_space + 1);
+            if (second_space == std::string::npos) {
+                line_start = i + 1;
+                continue;
+            }
+            const std::string ts_field = (third_space == std::string::npos)
+                ? line.substr(second_space + 1)
+                : line.substr(second_space + 1, third_space - second_space - 1);
             try {
                 const std::int64_t timestamp_ms = std::stoll(ts_field);
                 latencies_ms.push_back(now_ms() - timestamp_ms);

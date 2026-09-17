@@ -1,10 +1,10 @@
 #pragma once
 
 // A thin RAII wrapper around FreeRTOS's static task creation. Every one of
-// the four pipeline stages -- sensor_task, process_task, telemetry_task,
-// command_task -- is one instance of this class: same wrapper, four
-// different priorities and stack sizes, four independent "workers" that the
-// scheduler interleaves on one CPU core.
+// the three pipeline stages -- sensor_task, telemetry_task, command_task --
+// is one instance of this class: same wrapper, three different priorities
+// and stack sizes, three independent "workers" that the scheduler
+// interleaves on one CPU core.
 //
 // Design choice: the task's stack lives inside the Task object itself, sized
 // at compile time via the StackWords template parameter. That is what makes

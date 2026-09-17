@@ -26,8 +26,6 @@
 
 namespace {
 
-// --- for you to complete -------------------------------------------------
-//
 // Resolves host (a literal IPv4 address, e.g. "127.0.0.1" -- no DNS lookup
 // needed for this project) and connects a plain, blocking TCP socket to
 // host:port. Returns the connected fd, or -1 if any step failed.
@@ -61,7 +59,6 @@ int connect_to_server(const std::string& host, std::uint16_t port) {
 
     return fd;
 }
-// ---------------------------------------------------------------------------
 
 }  // namespace
 
@@ -101,6 +98,7 @@ int main(int argc, char** argv) {
 
     std::vector<std::uint8_t> buffer;
     std::size_t valid_count = 0;
+    std::size_t alert_count = 0;
     std::size_t malformed_count = 0;
 
     while (true) {
@@ -110,10 +108,10 @@ int main(int argc, char** argv) {
             break;  // the server closed the connection, or a fatal error -- either way, stop
         }
         buffer.insert(buffer.end(), chunk, chunk + n);
-        client::handle_incoming(buffer, valid_count, malformed_count);
+        client::handle_incoming(buffer, valid_count, alert_count, malformed_count);
     }
 
-    std::cout << "connection closed -- " << valid_count << " valid update(s), "
-              << malformed_count << " malformed line(s)\n";
+    std::cout << "connection closed -- " << valid_count << " valid update(s), " << alert_count
+              << " alert(s), " << malformed_count << " malformed line(s)\n";
     ::close(fd);
 }

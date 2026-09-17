@@ -1,10 +1,10 @@
-// The last stage of the outgoing pipeline: turns a processed reading into
-// an actual wire-format proto::SamplePayload, encodes it with the exact
-// same proto::frame_encoder that 57 host-side tests exercised in stage 1,
-// and writes the resulting bytes out over the UART. This is the one place
-// in the whole node/ tree that has any idea proto:: exists -- everything
-// upstream (sensor_task, process_task) works in plain internal structs and
-// has never heard of a session_id or a CRC.
+// The last stage of the outgoing pipeline: turns a reading into an actual
+// wire-format proto::SamplePayload, encodes it with the exact same
+// proto::frame_encoder that 57 host-side tests exercised in stage 1, and
+// writes the resulting bytes out over the UART. This is the one place in
+// the whole node/ tree that has any idea proto:: exists -- sensor_task
+// upstream works in a plain internal struct and has never heard of a
+// session_id or a CRC.
 #include "tasks/telemetry_task.hpp"
 
 #include "proto/frame_encoder.hpp"
@@ -18,10 +18,10 @@ namespace tasks {
 
 void TelemetryTask(void* context) {
     auto* pipeline = static_cast<Pipeline*>(context);
-    ProcessedReading reading{};
+    Reading reading{};
 
     for (;;) {
-        if (!pipeline->processed_queue.receive(reading)) {
+        if (!pipeline->reading_queue.receive(reading)) {
             continue;
         }
 

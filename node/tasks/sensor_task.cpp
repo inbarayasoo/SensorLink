@@ -2,8 +2,9 @@
 // temperature reading (there is no real probe attached to this emulator)
 // and hands it downstream. This is the task that would, on a real cooling
 // unit, be the one actually talking to the temperature/pressure probes --
-// everything after it (process_task, telemetry_task) has no idea whether
-// the reading came from real hardware or not.
+// everything after it (telemetry_task, and the server once the reading
+// reaches it) has no idea whether the reading came from real hardware or
+// not.
 #include "tasks/sensor_task.hpp"
 
 #include <cstdint>
@@ -19,9 +20,9 @@ namespace {
 
 // A stand-in for a real probe. Deliberately deterministic (a triangle wave,
 // not random noise): the point of a fake sensor in this project is to
-// exercise everything downstream -- process_task's averaging, the
-// threshold, telemetry_task's encoding -- against known, reproducible
-// input, not to look realistic.
+// exercise everything downstream -- the server's averaging and threshold
+// check, telemetry_task's encoding -- against known, reproducible input,
+// not to look realistic.
 std::int32_t FakeReadingMilli(std::uint32_t sample_index) {
     
     constexpr std::int32_t kBaselineMilli = 4000;
@@ -48,10 +49,10 @@ void SensorTask(void* context) {
             rate_hz = pipeline->config.sample_rate_hz;
         }
 
-        RawReading reading{};
+        Reading reading{};
         reading.value_milli = FakeReadingMilli(sample_index);
         reading.timestamp_ms = xTaskGetTickCount() * portTICK_PERIOD_MS;
-        pipeline->raw_queue.send(reading);
+        pipeline->reading_queue.send(reading);
         ++sample_index;
 
         const std::uint8_t safe_rate_hz = (rate_hz == 0) ? 1 : rate_hz;

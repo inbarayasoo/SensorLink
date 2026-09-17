@@ -92,3 +92,11 @@ TEST(DeviceSession, SlowDownUpdatesTheCurrentRateAndReturnsAMatchingPayload) {
     EXPECT_EQ(payload.new_rate_hz, 1);
     EXPECT_EQ(session.current_rate_hz(), 1);
 }
+
+TEST(DeviceSession, NoteUptimeIsReadableViaLastUptimeMs) {
+    server::device_session session(/*session_id=*/1, kEpoch);
+
+    session.note_uptime(1234);
+
+    EXPECT_EQ(session.last_uptime_ms(), 1234u);
+}

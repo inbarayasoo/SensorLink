@@ -54,9 +54,10 @@ void ingest::dispatch(const proto::ParsedFrame& frame) {
     }
 }
 
-void ingest::handle_heartbeat(const proto::HeartbeatPayload&) {
+void ingest::handle_heartbeat(const proto::HeartbeatPayload& payload) {
     if (session_) {
         session_->note_activity(std::chrono::steady_clock::now());
+        session_->note_uptime(payload.uptime_ms);
     }
 }
 
@@ -64,8 +65,10 @@ void ingest::handle_sample(const proto::SamplePayload& payload) {
     if (!session_) {
         return;
     }
-    session_->note_activity(std::chrono::steady_clock::now());
-    store_.record(session_->session_id(), payload.metric_id, payload.value_milli, payload.timestamp_ms);
+    const auto now = std::chrono::steady_clock::now();
+    session_->note_activity(now);
+    session_->note_uptime(payload.timestamp_ms);
+    store_.record(session_->session_id(), payload.metric_id, payload.value_milli, payload.timestamp_ms, now);
 }
 
 void ingest::handle_hello(const proto::HelloPayload& payload) {

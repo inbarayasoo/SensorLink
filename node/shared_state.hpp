@@ -39,8 +39,7 @@ struct Pipeline {
     // anyway.
     os::Mutex config_mutex;
 
-    os::Queue<RawReading, kQueueCapacity> raw_queue;
-    os::Queue<ProcessedReading, kQueueCapacity> processed_queue;
+    os::Queue<Reading, kQueueCapacity> reading_queue;
 
     // The one physical link out of (and into) the device. Not owned here --
     // main() constructs the UartCmsdk and points this at it before any task

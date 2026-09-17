@@ -1,11 +1,11 @@
 #pragma once
 
 // A typed, statically-allocated wrapper around FreeRTOS's queue: the pipe
-// sensor_task uses to hand each reading to process_task without either of
+// sensor_task uses to hand each reading to telemetry_task without either of
 // them touching the other's memory directly. Without a queue here,
-// sensor_task would have to write straight into some variable process_task
+// sensor_task would have to write straight into some variable telemetry_task
 // also reads -- and since they run as independent, preemptible tasks, a
-// context switch landing mid-write would hand process_task a torn, half
+// context switch landing mid-write would hand telemetry_task a torn, half
 // updated reading. The queue makes "one whole item, or wait" the only thing
 // either side can observe.
 //
@@ -39,9 +39,9 @@ public:
 
     // Copies item onto the back of the queue. Blocks the calling task for up
     // to ticks_to_wait if the queue is currently full (this is exactly the
-    // backpressure point: if process_task falls behind and the queue fills,
-    // sensor_task blocks here instead of racing ahead and silently dropping
-    // readings). Returns false only if it timed out still full.
+    // backpressure point: if telemetry_task falls behind and the queue
+    // fills, sensor_task blocks here instead of racing ahead and silently
+    // dropping readings). Returns false only if it timed out still full.
     bool send(const T& item, TickType_t ticks_to_wait = portMAX_DELAY) {
         // Compare the result to pdTRUE and return that as a bool.
         return xQueueSendToBack(handle_, &item, ticks_to_wait) == pdTRUE;

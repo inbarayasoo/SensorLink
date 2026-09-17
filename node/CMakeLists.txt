@@ -11,7 +11,6 @@ add_executable(sensorlink-node
     hooks.cpp
     startup_gcc.cpp
     tasks/sensor_task.cpp
-    tasks/process_task.cpp
     tasks/telemetry_task.cpp
     tasks/command_task.cpp
     session.cpp

@@ -39,6 +39,17 @@ public:
     bool timed_out(std::chrono::steady_clock::time_point now,
                    std::chrono::milliseconds timeout) const;
 
+    // Records the device's own clock from the most recent frame that carried
+    // one (SAMPLE's timestamp_ms, HEARTBEAT's uptime_ms). Deliberately kept
+    // separate from note_activity()'s steady_clock stamp: the two are not
+    // comparable, one is the device's own free-running uptime counter (which
+    // resets on reboot), the other is the server's own monotonic clock used
+    // only for timeout math. Exists so housekeeping() can hand
+    // store::latch_offline() a device-clock timestamp, consistent with every
+    // SAMPLE/ALERT line the subscriber protocol already carries one on.
+    void note_uptime(std::uint32_t device_uptime_ms) { last_uptime_ms_ = device_uptime_ms; }
+    std::uint32_t last_uptime_ms() const { return last_uptime_ms_; }
+
     // Builds a SLOW_DOWN payload lowering the device's rate. Called by
     // whichever component notices a subscriber falling behind -- the piece
     // that closes the backpressure loop end to end, from a slow dashboard
@@ -54,6 +65,7 @@ private:
     bool connected_ = false;
     std::uint8_t current_rate_hz_ = 0;
     std::chrono::steady_clock::time_point last_activity_;
+    std::uint32_t last_uptime_ms_ = 0;
 };
 
 }  // namespace server

@@ -36,7 +36,7 @@ void vApplicationGetIdleTaskMemory(StaticTask_t** idle_task_tcb_buffer,
 // checks the outgoing task's stack against both its high-water mark and a
 // canary pattern. A cooling-unit node runs unattended for months; a
 // sensor_task whose stack was under-budgeted must stop loudly here, not
-// corrupt process_task's moving-average state next to it in RAM.
+// corrupt some other task's state next to it in RAM.
 //
 // task_name stays a plain char* (not const): FreeRTOS's own task.h forward-
 // declares this hook with that exact signature, and a C-linkage function's

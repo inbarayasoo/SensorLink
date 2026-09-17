@@ -1,6 +1,6 @@
-// Wires the full four-task pipeline together and boots it:
-//   sensor_task -> process_task -> telemetry_task  (data going out)
-//   command_task                                    (config coming in)
+// Wires the full three-task pipeline together and boots it:
+//   sensor_task -> telemetry_task  (data going out)
+//   command_task                   (config coming in)
 // This replaces the temporary MonitorTask stand-in from the previous
 // sub-section now that telemetry_task can actually put real proto:: frames
 // on the wire. session.hpp (the HELLO/CONFIG handshake itself) is still a
@@ -14,7 +14,6 @@
 #include "semihosting.hpp"
 #include "shared_state.hpp"
 #include "tasks/command_task.hpp"
-#include "tasks/process_task.hpp"
 #include "tasks/sensor_task.hpp"
 #include "tasks/telemetry_task.hpp"
 
@@ -32,12 +31,11 @@ int main() {
 
     // Priorities: sensor_task highest -- sampling must never be preempted by
     // anything downstream of it. command_task next -- a SLOW_DOWN or CONFIG
-    // message should be applied promptly. process_task and telemetry_task
-    // are bulk work further down the pipeline; a short delay in either just
-    // means data reaches the wire a little later, not a missed sample.
+    // message should be applied promptly. telemetry_task is bulk work
+    // further down the pipeline; a short delay there just means data reaches
+    // the wire a little later, not a missed sample.
     static os::Task<kStackWords> sensor("sensor", 3, tasks::SensorTask, &pipeline);
     static os::Task<kStackWords> command("command", 2, tasks::CommandTask, &pipeline);
-    static os::Task<kStackWords> process("process", 2, tasks::ProcessTask, &pipeline);
     static os::Task<kStackWords> telemetry("telemetry", 1, tasks::TelemetryTask, &pipeline);
 
     vTaskStartScheduler();

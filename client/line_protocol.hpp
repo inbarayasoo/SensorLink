@@ -15,18 +15,24 @@ namespace client {
 // line-splitting is tested without a real network connection.
 //
 // Scans buffer for every complete line it holds (ending in '\n', tolerating
-// a preceding '\r'), and for each one:
-//   - tries to parse it as "<metric> <timestamp_ms> <value_milli>" (the
-//     exact format server/subscriber.cpp's publish() sends -- three
-//     whitespace-separated fields, the last two parsing fully as
-//     integers); if it parses, prints it and increments valid_count.
-//   - otherwise, prints it as-is and increments malformed_count. This
-//     project's text protocol carries no CRC, so a line that does not
+// a preceding '\r'), and for each one recognizes one of three shapes:
+//   - "<metric> <session_id> <timestamp_ms> <value_milli>" (the exact
+//     format server/subscriber.cpp's publish() sends) -- prints it and
+//     increments valid_count.
+//   - "ALERT EXCURSION <session_id> <timestamp_ms> <value_milli>" or
+//     "ALERT OFFLINE <session_id> <timestamp_ms>" -- prints it and
+//     increments alert_count. Kept separate from valid_count deliberately:
+//     "we received an alert" is not the same event as "we received a
+//     sample", and folding the two together would silently change what
+//     valid_count has always measured.
+//   - anything else -- prints it as-is and increments malformed_count.
+//     This project's text protocol carries no CRC, so a line that does not
 //     parse is this client's equivalent of a corrupted frame -- this is
 //     what stands in for the "CRC-error counter" in docs/PLAN.md's stage 4
 //     description, adapted to a protocol that has no CRC to check.
 // Removes every consumed line from the front of buffer; a trailing partial
 // line's bytes are left in place, to be completed by a later read.
-void handle_incoming(std::vector<std::uint8_t>& buffer, std::size_t& valid_count, std::size_t& malformed_count);
+void handle_incoming(std::vector<std::uint8_t>& buffer, std::size_t& valid_count,
+                      std::size_t& alert_count, std::size_t& malformed_count);
 
 }  // namespace client

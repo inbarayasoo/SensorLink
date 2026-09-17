@@ -19,9 +19,9 @@
 #define configIDLE_SHOULD_YIELD                  1
 
 // --- Synchronization primitives ------------------------------------------
-// sensor_task / process_task / telemetry_task / command_task talk to each
-// other through exactly these two mechanisms: a queue for readings, a mutex
-// for the shared sample-rate config.
+// sensor_task / telemetry_task / command_task talk to each other through
+// exactly these two mechanisms: a queue for readings, a mutex for the
+// shared sample-rate config.
 #define configUSE_MUTEXES                        1
 #define configUSE_RECURSIVE_MUTEXES              0
 #define configUSE_COUNTING_SEMAPHORES            0

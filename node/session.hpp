@@ -7,9 +7,9 @@
 // forever after). This is deliberately separate from command_task.cpp:
 // this file is the *policy* ("what does a session mean, what goes in a
 // HELLO"), command_task.cpp is the *mechanism* ("read bytes, find frames,
-// call into this file at the right moments"). The same separation already
-// exists between process_task (policy: what counts as out-of-range) and
-// sensor_task (mechanism: how a reading gets produced).
+// call into this file at the right moments"). The same separation exists on
+// the server side, between store.cpp (policy: what counts as out-of-range)
+// and ingest.cpp (mechanism: how a decoded SAMPLE gets there).
 namespace tasks {
 
 struct Pipeline;

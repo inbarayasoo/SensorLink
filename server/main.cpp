@@ -15,11 +15,12 @@
 //                       COBS-framed protocol (HELLO / SAMPLE / HEARTBEAT).
 //   --subscribe <port>  dashboards and alerting clients connect here and
 //                       speak the line-based text protocol (SUBSCRIBE /
-//                       UNSUBSCRIBE / STATS).
+//                       UNSUBSCRIBE / STATS / ACK).
 //
 // A single housekeeping timer, running once a second, does everything that
 // does not need to happen the instant a byte arrives: drop connections the
-// kernel already tore down, evict devices that stopped heartbeating, and --
+// kernel already tore down, evict devices that stopped heartbeating (and
+// latch an OFFLINE alert for them on the way out -- see store.hpp), and --
 // the piece that closes the backpressure loop end to end -- notice a
 // congested subscriber and tell every connected device to slow down.
 
@@ -72,8 +73,6 @@ struct SubscriberSlot {
 using DeviceMap = std::unordered_map<int, DeviceSlot>;
 using SubscriberMap = std::unordered_map<int, SubscriberSlot>;
 
-// --- for you to complete -----------------------------------------------
-//
 // Creates a non-blocking TCP socket, bound to `port` on every local
 // interface, already listening. Returns the listening fd, or -1 if any
 // step failed.
@@ -144,7 +143,6 @@ void accept_devices(server::event_loop& loop, int listener_fd, server::store& da
         devices.emplace(fd, std::move(slot));
     }
 }
-// -------------------------------------------------------------------------
 
 // Same shape as accept_devices, for the subscriber listener: no session id
 // to hand out, and the subscriber has to register itself with data_store so
@@ -159,7 +157,7 @@ void accept_subscribers(server::event_loop& loop, int listener_fd, server::store
 
         SubscriberSlot slot;
         slot.conn = std::make_unique<server::connection>(loop, fd);
-        slot.sub = std::make_unique<server::subscriber>(*slot.conn);
+        slot.sub = std::make_unique<server::subscriber>(*slot.conn, data_store);
         slot.conn->on_readable([sub = slot.sub.get()] { sub->on_readable(); });
         data_store.add_subscriber(slot.sub.get());
 
@@ -189,6 +187,16 @@ void housekeeping(server::event_loop& loop, server::store& data_store,
         const bool timed_out = it->second.ing->has_session() &&
                                 it->second.ing->session()->timed_out(now, kDeviceTimeout);
         if (disconnected || timed_out) {
+            // Either way the device is gone missing, from a cold-chain
+            // safety point of view it does not matter whether it dropped
+            // cleanly or simply stopped answering -- there is no
+            // temperature reading for however long this lasts. Only
+            // possible with a session: a device that never sent HELLO has
+            // no session_id for an alert to be keyed on.
+            if (it->second.ing->has_session()) {
+                data_store.latch_offline(it->second.ing->session()->session_id(),
+                                          it->second.ing->session()->last_uptime_ms(), now);
+            }
             it = devices.erase(it);
             continue;
         }

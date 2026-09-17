@@ -16,16 +16,20 @@ node — firmware for an **ARM Cortex-M microcontroller** running **FreeRTOS**,
 emulated in **QEMU** with no physical hardware — that streams COBS-framed,
 CRC-16-checked packets over **TCP** to a central Linux server built on a
 single-threaded **epoll event loop**, which fans the data out live to
-subscriber programs and can tell a struggling node to slow down. The same
-shape fits smart-home sensing, air-quality monitoring, or machine-vibration
+subscriber programs and can tell a struggling node to slow down, latching
+an alert — until an operator explicitly acknowledges it — when a reading
+crosses a safety threshold or a node goes quiet. The same shape fits
+smart-home sensing, air-quality monitoring, or machine-vibration
 monitoring — swap the labels, keep the code.
 
 ## Features
 
 - COBS-framed, CRC-16-checked binary protocol shared between firmware and server
-- Four fixed-priority FreeRTOS tasks, zero dynamic allocation in the data path
+- Three fixed-priority FreeRTOS tasks, zero dynamic allocation in the data path
 - Single-threaded epoll event loop, non-blocking multi-client TCP server
 - Server-driven sample rate, with live SLOW_DOWN backpressure to the devices
+- Server-side EMA smoothing and threshold detection, with latched alerts
+  (temperature excursion / device offline) requiring explicit acknowledgment
 - Bidirectional heartbeat between device and server
 - Benchmarked up to 1000 simulated devices
 
@@ -35,7 +39,7 @@ monitoring — swap the labels, keep the code.
 proto/    shared protocol library — COBS, CRC-16, frame parser/encoder,
           fixed-capacity containers (host- and firmware-tested)
 node/     FreeRTOS firmware for the QEMU-emulated Cortex-M target —
-          sensor/process/telemetry/command tasks, session handling,
+          sensor/telemetry/command tasks, session handling,
           RAII wrappers over the FreeRTOS API, UART driver
 server/   epoll-based multi-client TCP server — event loop, connection
           handling, device sessions, ingest, subscriber protocol,
@@ -99,13 +103,13 @@ measures throughput, drop count, ingest-to-feed latency, and server memory.
 Throughput scales linearly with device count, drops stay negligible, and
 latency stays at 0-1 ms even at 1000 concurrent connections.
 
-Firmware footprint: ~8 KB flash, ~6.8 KB RAM for the full node image
-(four FreeRTOS tasks, the protocol library, and the UART driver), measured
+Firmware footprint: ~8 KB flash, ~6.0 KB RAM for the full node image
+(three FreeRTOS tasks, the protocol library, and the UART driver), measured
 with `arm-none-eabi-size` on the QEMU MPS2-AN385 (Cortex-M3) target.
 
 ## Testing & CI
 
-96 GoogleTest unit tests across `proto/`, `server/`, and `client/`, plus a
+114 GoogleTest unit tests across `proto/`, `server/`, and `client/`, plus a
 real integration test that boots the firmware in QEMU against a real server
 and asserts the sample rate actually drops when the server sends
 `SLOW_DOWN`. Four jobs run on every push: host build + test + coverage
@@ -136,6 +140,18 @@ report, firmware cross-build, the QEMU integration test, and static analysis
   is off). Heap fragmentation and out-of-memory are unpredictable on a
   memory-constrained device; every task, queue, and buffer instead gets a
   fixed size decided up front.
+- **Smoothing and threshold detection run on the server, not the firmware.**
+  The moving average and threshold check are cheap enough to run anywhere,
+  so cost isn't the deciding factor — flexibility is: changing the
+  threshold or filter algorithm later means redeploying the server, not
+  reflashing every device already in the field. The firmware only measures
+  and forwards a raw reading.
+- **Alerts latch until an explicit ACK, not auto-clear on recovery.** A
+  cold-chain excursion may already have spoiled a shipment by the time the
+  reading returns to normal, so a temperature back in range must not
+  silently close the incident. Acknowledging an alert reports how long it
+  was actually open — measured from when it first triggered, not reset by
+  an inspection that finds it still ongoing.
 
 ## License
 

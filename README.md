@@ -11,7 +11,7 @@ delivery truck, and a pharmacy fridge — three physically separate
 refrigeration units that must each stay within a safe temperature range, a
 failure in any one of them caught too late by a twice-a-day clipboard check.
 SensorLink is an end-to-end telemetry system for exactly this kind of
-scenario, written entirely in C++: each unit carries an identical sensor
+scenario, written in C/C++: each unit carries an identical sensor
 node — firmware for an **ARM Cortex-M microcontroller** running **FreeRTOS**,
 emulated in **QEMU** with no physical hardware — that streams COBS-framed,
 CRC-16-checked packets over **TCP** to a central Linux server built on a
